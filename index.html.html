@@ -1,0 +1,124 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>X-Ray Lung AI Analysis</title>
+    <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@latest/dist/tf.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@teachablemachine/image@latest/dist/teachablemachine-image.min.js"></script>
+    
+    <style>
+        body { font-family: 'Kanit', sans-serif; background-color: #f0f2f5; display: flex; flex-direction: column; align-items: center; padding: 40px; margin: 0; }
+        .card { background: white; padding: 30px; border-radius: 20px; box-shadow: 0 10px 25px rgba(0,0,0,0.1); width: 100%; max-width: 600px; text-align: center; }
+        h1 { color: #1a73e8; margin-bottom: 10px; }
+        .upload-area { border: 2px dashed #1a73e8; padding: 20px; border-radius: 15px; margin: 20px 0; cursor: pointer; transition: 0.3s; }
+        .upload-area:hover { background: #e8f0fe; }
+        #image-preview { width: 100%; max-height: 350px; object-fit: contain; margin-top: 20px; border-radius: 10px; display: none; }
+        #label-container { margin-top: 25px; text-align: left; }
+        .result-item { margin-bottom: 15px; }
+        .bar-label { display: flex; justify-content: space-between; font-weight: bold; margin-bottom: 5px; }
+        .bar-bg { background: #e0e0e0; border-radius: 10px; height: 18px; width: 100%; }
+        .bar-fill { height: 100%; border-radius: 10px; transition: width 0.8s ease-out; width: 0%; }
+        .status-msg { margin-top: 10px; font-weight: bold; padding: 10px; border-radius: 5px; }
+        .error { color: #d93025; background: #fce8e6; }
+        .success { color: #188038; background: #e6f4ea; }
+    </style>
+</head>
+<body>
+
+<div class="card">
+    <h1>🫁 AI วิเคราะห์ปอด</h1>
+    <p>ใส่รูปภาพ X-ray เพื่อประมวลผล (Normal / Adnomal)</p>
+    
+    <div id="status" class="status-msg">กำลังโหลดสมอง AI...</div>
+
+    <input type="file" id="file-input" accept="image/*" style="display: none;" onchange="predict(event)">
+    <div class="upload-area" onclick="document.getElementById('file-input').click()">
+        <strong>คลิกเพื่อเลือกรูปภาพ X-ray</strong>
+    </div>
+
+    <img id="image-preview" alt="X-ray Preview">
+
+    <div id="label-container">
+        </div>
+
+    <p style="font-size: 11px; color: #777; margin-top: 30px; border-top: 1px solid #eee; pt: 10px;">
+        *คำเตือน: นี่คือโปรเจกต์ทดลองเพื่อการศึกษา ไม่สามารถใช้ทางการแพทย์ได้
+    </p>
+</div>
+
+<script type="text/javascript">
+    // ตั้งค่า URL ของโมเดล (ใช้ว่างเปล่าเพื่อให้หาไฟล์ในโฟลเดอร์เดียวกัน)
+    const MODEL_PATH = "./"; 
+    let model, labelContainer, maxPredictions;
+
+    // 1. ฟังก์ชันโหลดโมเดลเมื่อเปิดเว็บ
+    async function init() {
+        const statusDiv = document.getElementById("status");
+        try {
+            const modelURL = MODEL_PATH + "model.json";
+            const metadataURL = MODEL_PATH + "metadata.json";
+            
+            model = await tmImage.load(modelURL, metadataURL);
+            maxPredictions = model.getTotalClasses();
+            
+            statusDiv.innerText = "✅ AI พร้อมใช้งานแล้ว! เลือกรูปได้เลย";
+            statusDiv.className = "status-msg success";
+        } catch (e) {
+            console.error(e);
+            statusDiv.innerText = "❌ โหลดโมเดลไม่สำเร็จ! เช็คว่ามีไฟล์ model.json อยู่ในโฟลเดอร์เดียวกันไหม";
+            statusDiv.className = "status-msg error";
+        }
+    }
+
+    // 2. ฟังก์ชันวิเคราะห์รูปภาพ
+    async function predict(event) {
+        const file = event.target.files[0];
+        if (!file) return;
+
+        // แสดงรูปที่เลือก
+        const img = document.getElementById("image-preview");
+        img.src = window.URL.createObjectURL(file);
+        img.style.display = "block";
+
+        // ล้างค่าเก่า
+        document.getElementById("label-container").innerHTML = "กำลังประมวลผล...";
+
+        // รอรูปโหลดเข้าหน่วยความจำ แล้วสั่ง AI วิเคราะห์
+        img.onload = async () => {
+            const prediction = await model.predict(img);
+            drawResults(prediction);
+        };
+    }
+
+    // 3. ฟังก์ชันวาดแถบเปอร์เซ็นต์
+    function drawResults(results) {
+        const container = document.getElementById("label-container");
+        container.innerHTML = ""; // ล้างข้อความ "กำลังประมวลผล"
+
+        results.forEach(res => {
+            const percent = (res.probability * 100).toFixed(2);
+            // เลือกสี: ถ้าชื่อมีคำว่า Normal ให้เป็นสีฟ้า/เขียว ถ้ามีคำว่า Ad ให้เป็นสีแดง
+            const barColor = res.className.toLowerCase().includes('normal') ? '#34a853' : '#ea4335';
+            
+            const html = `
+                <div class="result-item">
+                    <div class="bar-label">
+                        <span>${res.className}</span>
+                        <span>${percent}%</span>
+                    </div>
+                    <div class="bar-bg">
+                        <div class="bar-fill" style="width: ${percent}%; background-color: ${barColor};"></div>
+                    </div>
+                </div>
+            `;
+            container.innerHTML += html;
+        });
+    }
+
+    // สั่งให้โหลดโมเดลทันทีที่เปิดหน้าจอ
+    init();
+</script>
+
+</body>
+</html>
