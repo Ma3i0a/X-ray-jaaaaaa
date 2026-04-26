@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>AI Chest X-Ray Analysis</title>
+    <title>AI Chest X-Ray Analysis - Multi-Class</title>
     <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@latest/dist/tf.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/@teachablemachine/image@latest/dist/teachablemachine-image.min.js"></script>
     <link href="https://fonts.googleapis.com/css2?family=Kanit:wght@300;400;600&display=swap" rel="stylesheet">
@@ -11,49 +11,48 @@
     <style>
         body { font-family: 'Kanit', sans-serif; background-color: #f0f2f5; display: flex; flex-direction: column; align-items: center; padding: 20px; margin: 0; }
         .card { background: white; padding: 30px; border-radius: 20px; box-shadow: 0 10px 30px rgba(0,0,0,0.1); width: 100%; max-width: 500px; text-align: center; box-sizing: border-box; }
-        h2 { color: #1a73e8; margin-top: 0; }
+        h2 { color: #1a73e8; margin-bottom: 20px; }
         
-        /* ส่วนแสดงสถานะ */
-        #status { padding: 10px; border-radius: 10px; font-weight: bold; margin-bottom: 20px; font-size: 14px; }
+        #status { padding: 12px; border-radius: 12px; font-weight: bold; margin-bottom: 20px; font-size: 14px; }
         .ok { background: #e6f4ea; color: #1e8e3e; border: 1px solid #34a853; }
         .err { background: #fce8e6; color: #d93025; border: 1px solid #ea4335; }
 
-        /* ส่วนอัปโหลด */
-        .upload-zone { border: 2px dashed #1a73e8; padding: 30px; border-radius: 15px; cursor: pointer; transition: 0.3s; background: #f8fbff; margin-bottom: 20px; }
-        .upload-zone:hover { background: #e8f0fe; border-color: #1557b0; }
-        #image-preview { width: 100%; border-radius: 10px; margin-top: 10px; display: none; border: 1px solid #ddd; }
+        .upload-zone { border: 2px dashed #1a73e8; padding: 40px 20px; border-radius: 15px; cursor: pointer; background: #f8fbff; margin-bottom: 20px; transition: 0.3s; }
+        .upload-zone:hover { background: #e8f0fe; }
+        #image-preview { width: 100%; border-radius: 12px; margin-bottom: 25px; display: none; border: 1px solid #ddd; }
 
-        /* ส่วนผลลัพธ์ */
-        .result-item { margin-top: 20px; text-align: left; }
-        .bar-label { display: flex; justify-content: space-between; font-weight: 600; margin-bottom: 5px; }
-        .bar-bg { background: #eee; border-radius: 10px; height: 18px; width: 100%; overflow: hidden; }
-        .bar-fill { height: 100%; transition: width 0.6s cubic-bezier(0.4, 0, 0.2, 1); width: 0%; }
+        /* การจัดกลุ่มผลลัพธ์ */
+        .main-bar-container { margin-bottom: 15px; padding: 15px; border-radius: 12px; background: #fff; border: 1px solid #eee; text-align: left; }
+        .bar-info { display: flex; justify-content: space-between; font-weight: 600; margin-bottom: 8px; font-size: 16px; }
+        .bar-outer { background: #eee; border-radius: 10px; height: 16px; width: 100%; overflow: hidden; }
+        .bar-inner { height: 100%; transition: width 0.8s cubic-bezier(0.4, 0, 0.2, 1); }
 
-        /* ส่วนคำเตือน */
-        .medical-disclaimer { margin-top: 30px; padding: 15px; background-color: #fff4e5; border-left: 5px solid #ff9800; border-radius: 8px; text-align: left; font-size: 12px; color: #663c00; }
-        .disclaimer-title { font-weight: bold; font-size: 14px; margin-bottom: 5px; color: #e65100; }
+        /* สไตล์หัวข้อย่อย */
+        .sub-disease-list { margin-left: 20px; border-left: 3px solid #dee2e6; padding-left: 15px; margin-top: 15px; }
+        .sub-item { margin-bottom: 12px; }
+        .sub-info { display: flex; justify-content: space-between; font-size: 13px; color: #444; margin-bottom: 4px; }
+        .sub-bar-outer { background: #f0f0f0; border-radius: 5px; height: 8px; width: 100%; overflow: hidden; }
+
+        .disclaimer { margin-top: 30px; padding: 15px; background: #fff4e5; border-radius: 10px; font-size: 12px; text-align: left; border-left: 5px solid #ff9800; color: #663c00; line-height: 1.6; }
     </style>
 </head>
 <body>
 
 <div class="card">
-    <h2>🔍 วิเคราะห์ภาพ X-ray</h2>
-    <div id="status" class="status err">⏳ กำลังเชื่อมต่อระบบ AI...</div>
+    <h2>🔍 AI วิเคราะห์ปอด</h2>
+    <div id="status" class="status err">⏳ กำลังโหลดระบบ AI...</div>
 
     <input type="file" id="file-input" accept="image/*" style="display: none;" onchange="predict(event)">
     <div class="upload-zone" onclick="document.getElementById('file-input').click()">
-        <strong>📁 คลิกเพื่อเลือกรูปภาพ</strong><br>
-        <span style="font-size: 12px; color: #5f6368;">(รองรับเฉพาะไฟล์รูปภาพปอด X-ray)</span>
+        <strong>📁 คลิกเพื่อเลือกรูปภาพ X-ray</strong>
+        <p style="font-size: 12px; color: #666; margin: 5px 0 0 0;">(คัดกรอง: Normal, Pneumonia, TB, Pneumothorax)</p>
     </div>
 
     <img id="image-preview">
-    <div id="result-container"></div>
+    <div id="result-area"></div>
 
-    <div class="medical-disclaimer">
-        <div class="disclaimer-title">⚠️ ข้อกำหนดและคำเตือน</div>
-        <div>• ระบบนี้เป็นส่วนหนึ่งของโครงงานศึกษาเท่านั้น</div>
-        <div>• ผลลัพธ์จาก AI <b>ไม่สามารถใช้แทนการวินิจฉัยของแพทย์ได้</b></div>
-        <div>• หากท่านมีอาการผิดปกติ โปรดปรึกษาแพทย์ผู้เชี่ยวชาญทันที</div>
+    <div class="disclaimer">
+        <b>⚠️ คำเตือน:</b> เว็บไซต์นี้จัดทำเพื่อการศึกษาเท่านั้น ข้อมูลจาก AI ไม่สามารถใช้แทนการวินิจฉัยของแพทย์ได้ หากมีอาการผิดปกติกรุณาพบแพทย์ทันที
     </div>
 </div>
 
@@ -61,69 +60,84 @@
     const URL = "./"; 
     let model;
 
-    // โหลดโมเดล
     async function init() {
         try {
-            // ป้องกันการจำค่าเก่าด้วยการเติม timestamp
             const t = new Date().getTime();
-            model = await tmImage.load(URL + "model.json?v=" + t, URL + "metadata.json?v=" + t);
-            document.getElementById("status").innerText = "✅ AI พร้อมทำงานแล้ว";
+            model = await tmImage.load(URL + "model.json?v="+t, URL + "metadata.json?v="+t);
+            document.getElementById("status").innerText = "● AI พร้อมประมวลผลแยกโรค";
             document.getElementById("status").className = "status ok";
         } catch (e) {
-            document.getElementById("status").innerText = "❌ โหลดโมเดลไม่สำเร็จ (เช็คไฟล์ในโฟลเดอร์)";
-            document.getElementById("status").className = "status err";
+            document.getElementById("status").innerText = "● ไม่พบไฟล์โมเดลในระบบ";
         }
     }
 
-    // ประมวลผลรูปภาพ
     async function predict(event) {
         const file = event.target.files[0];
         if (!file) return;
-
         const img = document.getElementById("image-preview");
         img.src = window.URL.createObjectURL(file);
         img.style.display = "block";
-
         img.onload = async () => {
             const prediction = await model.predict(img);
-            showResults(prediction);
+            renderResults(prediction);
         };
     }
 
-    // แสดงผลและแยกสี
-    function showResults(results) {
-        const container = document.getElementById("result-container");
-        container.innerHTML = "";
+    function renderResults(results) {
+        const area = document.getElementById("result-area");
+        area.innerHTML = "";
 
+        let normalScore = 0;
+        let diseases = [];
+        let totalAbnormal = 0;
+
+        // จัดกลุ่มข้อมูล
         results.forEach(res => {
-            const prob = (res.probability * 100).toFixed(2);
-            const name = res.className.toLowerCase().trim();
-            
-            let color = "#bdc1c6"; // สีเทาเริ่มต้น
-
-            // เช็คชื่อคลาสเพื่อกำหนดสี (รองรับ Normal / Abnormal / Adnomal)
-            if (name.includes("norm")) {
-                color = "#28a745"; // เขียว
-            } else if (name.includes("ab") || name.includes("ad") || name.includes("ไม่")) {
-                color = "#dc3545"; // แดง
+            if (res.className.toLowerCase().includes("normal")) {
+                normalScore = res.probability;
+            } else {
+                diseases.push(res);
+                totalAbnormal += res.probability;
             }
+        });
 
-            container.innerHTML += `
-                <div class="result-item">
-                    <div class="bar-label">
-                        <span>${res.className}</span>
-                        <span>${prob}%</span>
-                    </div>
-                    <div class="bar-bg">
-                        <div class="bar-fill" style="width: ${prob}%; background-color: ${color};"></div>
-                    </div>
+        // 1. แสดงแถบผลตรวจปกติ
+        const nPct = (normalScore * 100).toFixed(2);
+        area.innerHTML += `
+            <div class="main-bar-container">
+                <div class="bar-info"><span>✅ ผลตรวจปกติ (Normal)</span><span>${nPct}%</span></div>
+                <div class="bar-outer"><div class="bar-inner" style="width: ${nPct}%; background: #28a745;"></div></div>
+            </div>
+        `;
+
+        // 2. แสดงแถบแม่ "ความเสี่ยงผิดปกติ" และลิสต์โรคย่อย
+        const abPct = (totalAbnormal * 100).toFixed(2);
+        let abHtml = `
+            <div class="main-bar-container" style="border-color: #f5c6cb;">
+                <div class="bar-info" style="color: #d93025;"><span>❌ พบความเสี่ยง (Abnormal)</span><span>${abPct}%</span></div>
+                <div class="bar-outer"><div class="bar-inner" style="width: ${abPct}%; background: #d93025;"></div></div>
+                <div class="sub-disease-list">
+                    <p style="font-size: 13px; font-weight: bold; color: #666; margin: 0 0 10px 0;">รายละเอียดรายโรค:</p>
+        `;
+
+        // เรียงโรคที่เปอร์เซ็นต์สูงสุดขึ้นก่อน
+        diseases.sort((a, b) => b.probability - a.probability);
+
+        diseases.forEach(d => {
+            const dPct = (d.probability * 100).toFixed(2);
+            abHtml += `
+                <div class="sub-item">
+                    <div class="sub-info"><span>• คล้าย ${d.className}</span><span>${dPct}%</span></div>
+                    <div class="sub-bar-outer"><div style="width:${dPct}%; background:#6c757d; height:100%;"></div></div>
                 </div>
             `;
         });
+
+        abHtml += `</div></div>`;
+        area.innerHTML += abHtml;
     }
 
     init();
 </script>
-
 </body>
 </html>
